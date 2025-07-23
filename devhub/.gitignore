@@ -1,0 +1,39 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Django stuff
+*.log
+db.sqlite3
+media/
+staticfiles/
+static/
+*.pot
+*.pyc
+
+# VSCode / IDE settings
+.vscode/
+.idea/
+
+# Environment variables
+.env
+*.env
+
+# Mac / Windows
+.DS_Store
+Thumbs.db
+
+# Pip / cache
+pip-log.txt
+pip-delete-this-directory.txt
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
