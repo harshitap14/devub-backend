@@ -24,13 +24,7 @@ python-json-logger==3.3.0
 drf-yasg==1.21.10
 swagger_ui_bundle==1.1.0
 
-# Optional: Lightweight ML inference (no training)
-tensorflow-cpu==2.12.0  # Much smaller than GPU-enabled tensorflow
-numpy==1.24.4
-protobuf==3.20.3
-absl-py==2.1.0
-six==1.16.0
-wrapt==1.15.0
+
 
 # Misc (keep small)
 Pygments==2.18.0
