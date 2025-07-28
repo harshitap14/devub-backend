@@ -53,7 +53,7 @@ class Administrator(models.Model):
 
     def mark_login(self):
         self.last_login = timezone.now()
-        self.save(update_fields=["last_login_at"])
+        self.save(update_fields=["last_login"])
 
     def save(self, *args, **kwargs):
         fn = self.first_name.strip() if self.first_name else ""
