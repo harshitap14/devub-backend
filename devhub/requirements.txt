@@ -48,7 +48,7 @@ itsdangerous==2.2.0
 Jinja2==3.1.4
 jiter==0.6.1
 jmespath==1.0.1
-keras==3.6.0
+keras==2.12.0
 kiwisolver==1.4.8
 libclang==18.1.1
 loggly-python-handler==1.0.1
