@@ -1,2 +1,3 @@
-web: gunicorn devhubapp.wsgi --log-file -
+web: gunicorn devhub.devhub.wsgi --log-file -
+
 
