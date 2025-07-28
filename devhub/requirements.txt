@@ -30,7 +30,6 @@ Flask==3.0.3
 flatbuffers==24.3.25
 fonttools==4.58.0
 fsspec==2024.10.0
-gast==0.6.0
 google-api-core==1.34.1
 google-auth==2.35.0
 google-pasta==0.2.0
