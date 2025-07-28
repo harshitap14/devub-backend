@@ -4,7 +4,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-please-change")
-DEBUG = False
+DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
@@ -37,9 +37,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 CORS_ALLOWED_ORIGINS = [
+    "https://d0812bg9-8000.inc1.devtunnels.ms",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    #"https://d0812bg9-8000.inc1.devtunnels.ms/",
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
@@ -67,15 +67,17 @@ ASGI_APPLICATION = "devhub.asgi.application"
 
 # --- PostgreSQL ---
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME":  "devhub",
-        "USER": "postgres",
-        "PASSWORD": "123456789",
-        "HOST": "localhost",
-        "PORT":  "5432",
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'postgres',
+        'USER': 'postgres.plpmyfzzbnwjbwkxiymd',
+        'PASSWORD': 'gleecus1234@',  # Replace with your actual password
+        'HOST': 'aws-0-ap-south-1.pooler.supabase.com',
+        'PORT': '6543',
+        
     }
 }
+
 
 # --- Authentication Backends ---
 AUTHENTICATION_BACKENDS = [
@@ -111,7 +113,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000/auth/v1")
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://d0812bg9-8000.inc1.devtunnels.ms/",
+    "https://d0812bg9-8000.inc1.devtunnels.ms",
 ]
 #MEDIA_URL = "/media/"
 #MEDIA_ROOT = BASE_DIR / "media"

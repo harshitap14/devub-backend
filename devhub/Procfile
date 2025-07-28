@@ -1,0 +1,2 @@
+web: gunicorn devhub.wsgi --log-file -
+

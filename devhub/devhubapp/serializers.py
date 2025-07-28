@@ -14,7 +14,8 @@ class AdminCreateSerializer(serializers.ModelSerializer):
             "email",
             "role",
             "phone",
-            "address",
+            "city",
+            "country",
             "photo",
         ]
 
@@ -38,8 +39,9 @@ class AdminSerializer(serializers.ModelSerializer):
             "last_name",
             "full_name",
             "phone",
-            "address",
             "photo",
+            "city",
+            "country",
             "last_login_at",
             "created_at",
             "updated_at",
@@ -53,3 +55,25 @@ class AdminSerializer(serializers.ModelSerializer):
             "updated_at",
             "last_login_at",
         ]
+
+from rest_framework import serializers
+from .models import Deck, Category, AppUser
+
+class DeckSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Deck
+        fields = '__all__'
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    deck_name = serializers.CharField(source='deck.name', read_only=True)
+
+    class Meta:
+        model = Category
+        fields = '__all__'
+
+
+class AppUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AppUser
+        fields = ['id', 'first_name', 'last_name', 'email_address', 'email_verified', 'status', 'created_at', 'updated_at']

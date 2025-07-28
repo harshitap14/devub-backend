@@ -1,5 +1,5 @@
 # devhubapp/urls.py
-from django.urls import path
+from django.urls import path, include
 from rest_framework.authtoken.views import obtain_auth_token
 from django.conf import settings
 from django.conf.urls.static import static
@@ -15,11 +15,23 @@ from .api_views import (
     admin_logout_api,
     PasswordChangeDoneAPIView,
     AdminPhotoUploadView,
+    DeckViewSet, CategoryViewSet, AppUserViewSet,
 )
+from rest_framework.routers import DefaultRouter
 
+router = DefaultRouter()
+router.register(r'decks', DeckViewSet, basename='deck')
+router.register(r'categories', CategoryViewSet, basename='category')
+
+# AppUser - Custom ViewSet (only list + delete)
+user_list = AppUserViewSet.as_view({
+    'get': 'list',
+})
+user_delete = AppUserViewSet.as_view({
+    'delete': 'destroy',
+})
 urlpatterns = [
-    #update
-     path("admins/update/<int:pk>/", AdminUpdateOnlyView.as_view(), name="admin_update"),
+    path("admins/update/<int:pk>/", AdminUpdateOnlyView.as_view(), name="admin_update"),
 
     # List/Create
     path("admins/", AdminListCreateAPIView.as_view(), name="admin_list_create"),
@@ -27,7 +39,6 @@ urlpatterns = [
     path("admins/<int:pk>/", AdminRetrieveUpdateDestroyAPIView.as_view(), name="admin_detail"),
 
     # Auth flows
-    
     path("admins/login/", AdminLoginView.as_view(), name="admin_login"),
     path("admins/password/set/", admin_password_set_api, name="admin_password_set"),
     path("admins/password/reset/", admin_password_reset_request_api, name="admin_password_reset_request"),
@@ -36,11 +47,16 @@ urlpatterns = [
     path("admins/password/change/done/", PasswordChangeDoneAPIView.as_view(), name="password_change_done"),
     path('admins/photo/upload/', AdminPhotoUploadView.as_view(), name='admin-photo-upload'),
 
-    # Optional: DRF built-in token (username/password to Django user)
+    # DRF built-in token auth
     path("token/", obtain_auth_token, name="api_token"),
-    #logout
-    path("admins/logout/", admin_logout_api, name="admin_logout")
-]
 
-#if settings.DEBUG:
-    #urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Logout
+    path("admins/logout/", admin_logout_api, name="admin_logout"),
+
+    # ViewSets via router
+    path('', include(router.urls)),
+
+    # Custom AppUser endpoints
+    path('users/', user_list, name='user-list'),
+    path('users/<int:pk>/', user_delete, name='user-delete'),
+]

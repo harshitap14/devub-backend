@@ -144,10 +144,12 @@ class AdminLoginView(APIView):
             return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
         if hasattr(admin, "mark_login"):
             admin.mark_login()
+        print("Trying to login with", email, password)
+        print("Admin found:", admin)
         shadow_user = get_or_create_shadow_user_for_admin(admin)
         token, _ = Token.objects.get_or_create(user=shadow_user)
         return Response({"token": token.key, "admin": AdminSerializer(admin).data})
-
+       
 # ------------------------------------------------------------------
 # Admin Password Set (after welcome email)
 # ------------------------------------------------------------------
@@ -297,3 +299,46 @@ class AdminPhotoUploadView(APIView):
         admin.save(update_fields=["photo"])
 
         return Response({"success": True, "photo_url": photo_url}, status=200)
+    
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from .models import Deck, Category, AppUser
+from .serializers import DeckSerializer, CategorySerializer, AppUserSerializer
+from rest_framework.decorators import action
+
+# -----------------------------
+# Deck CRUD
+# -----------------------------
+class DeckViewSet(viewsets.ModelViewSet):
+    queryset = Deck.objects.all()
+    serializer_class = DeckSerializer
+    permission_classes = [AllowAny]
+
+
+
+# -----------------------------
+# Category CRUD
+# -----------------------------
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    permission_classes = [AllowAny]
+
+
+
+# -----------------------------
+# AppUser: List + Delete Only
+# -----------------------------
+class AppUserViewSet(viewsets.ViewSet):
+    def list(self, request):
+        users = AppUser.objects.all()
+        serializer = AppUserSerializer(users, many=True)
+        return Response(serializer.data)
+
+    def destroy(self, request, pk=None):
+        try:
+            user = AppUser.objects.get(pk=pk)
+            user.delete()
+            return Response({"message": "User deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+        except AppUser.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
