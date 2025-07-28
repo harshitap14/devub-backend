@@ -52,7 +52,7 @@ class Administrator(models.Model):
         return check_password(raw_password, self.password)
 
     def mark_login(self):
-        self.last_login_at = timezone.now()
+        self.last_login = timezone.now()
         self.save(update_fields=["last_login_at"])
 
     def save(self, *args, **kwargs):
