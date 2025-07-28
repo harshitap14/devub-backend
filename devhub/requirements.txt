@@ -125,4 +125,5 @@ urllib3==2.2.3
 Werkzeug==3.0.4
 wheel==0.45.0
 workos==5.23.0
-wrapt==1.16.0
+wrapt==1.14.1
+
