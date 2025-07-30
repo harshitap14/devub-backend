@@ -117,6 +117,7 @@ CSRF_TRUSTED_ORIGINS = [
 #MEDIA_URL = "/media/"
 #MEDIA_ROOT = BASE_DIR / "media"
 
+AUTH_USER_MODEL = 'devhubapp.AppUser'
 
 # Internationalization
 LANGUAGE_CODE = "en-us"
@@ -132,5 +133,6 @@ SUPABASE_S3_REGION = "ap-south-1"
 SUPABASE_BUCKET = "admin-photos"  
 SUPABASE_ACCESS_KEY = "0657c2617166a17418b662b3b379e84d"
 SUPABASE_SECRET_KEY = "2a757e52487be628691979badfb4a61cf9978eafb5f5006e590e9127e24a1e34"
+
 
 
