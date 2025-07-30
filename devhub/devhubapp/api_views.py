@@ -1,6 +1,4 @@
-"""devhubapp/api_views.py
-Cleaned and corrected API views for Administrator management.
-"""
+
 from __future__ import annotations
 from rest_framework.parsers import MultiPartParser, FormParser
 import logging
@@ -19,12 +17,28 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.permissions import AllowAny
-from botocore.exceptions import ClientError
+from django.contrib.auth import logout
 
+from botocore.exceptions import ClientError
+import random
+import string
+from django.utils import timezone
+from django.contrib.auth.hashers import check_password, make_password
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.core.mail import send_mail
+from .models import AppUser
+from .models import OTPVerification
+from django.urls import reverse
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from devhubapp.utils import get_or_create_shadow_user_for_appuser  # adjust import path
+from workos import WorkOSClient
 import os
 from .supabase_upload import upload_image_fileobj, build_public_url
 from .models import Administrator
-from .serializers import AdminCreateSerializer, AdminSerializer
+from .serializers import AdminCreateSerializer, AdminSerializer, AppUserSerializer
 from .email_utils import (
     generate_uid_and_token,
     send_admin_welcome_email,
@@ -342,3 +356,320 @@ class AppUserViewSet(viewsets.ViewSet):
             return Response({"message": "User deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
         except AppUser.DoesNotExist:
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+def generate_otp():
+    return ''.join(random.choices(string.digits, k=6))
+
+@permission_classes([AllowAny])
+class SignUpView(APIView):
+    def post(self, request):
+        data = request.data
+        email = data.get("email")
+
+        if AppUser.objects.filter(email).exists():
+            return Response({"error": "Email already registered."}, status=400)
+
+        user = AppUser(
+            first_name=data.get("first_name"),
+            last_name=data.get("last_name"),
+            email = email,
+        )
+        user.set_password(data.get("password"))
+        user.save()
+
+        otp = generate_otp()
+        OTPVerification.objects.create(email=email, otp=otp)
+
+        send_mail("Verify your Email", f"Your OTP is {otp}", "noreply@example.com", [email])
+
+        return Response({"message": "Signup successful. Verify OTP sent to email."})
+
+class SendEmailVerificationOTPView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        if not AppUser.objects.filter(email).exists():
+            return Response({"error": "User not found."}, status=404)
+
+        otp = generate_otp()
+        OTPVerification.objects.update_or_create(email=email, defaults={"otp": otp})
+        send_mail("Verify your Email", f"Your OTP is {otp}", "noreply@example.com", [email])
+        return Response({"message": "OTP sent for email verification."})
+    
+@permission_classes([AllowAny])
+class VerifyEmailOTPView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        otp = request.data.get("otp")
+
+        try:
+            otp_record = OTPVerification.objects.get(email=email, otp=otp)
+            user = AppUser.objects.get(email=email)
+            user.email_verified = True
+            user.save()
+            otp_record.delete()
+            return Response({"message": "Email verified successfully."})
+        except OTPVerification.DoesNotExist:
+            return Response({"error": "Invalid OTP."}, status=400)
+
+
+
+class UserLoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+        password = request.data.get("password")
+
+        if not email or not password:
+            return Response(
+                {"error": "Email and password required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = AppUser.objects.get(email=email)
+        except AppUser.DoesNotExist:
+            return Response(
+                {"error": "Invalid credentials."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        if not user.check_password(password):
+            return Response(
+                {"error": "Invalid credentials."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        shadow_user = get_or_create_shadow_user_for_appuser(user)
+        token, _ = Token.objects.get_or_create(user=shadow_user)
+
+        return Response({
+            "token": token.key,
+            "user": AppUserSerializer(user).data
+        }, status=status.HTTP_200_OK)
+        
+class UpdatePasswordView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        old_password = request.data.get("old_password")
+        new_password = request.data.get("new_password")
+
+        try:
+            user = AppUser.objects.get(email=email)
+            if user.check_password(old_password):
+                user.set_password(new_password)
+                user.save()
+                return Response({"message": "Password updated successfully."})
+            return Response({"error": "Incorrect old password."}, status=400)
+        except AppUser.DoesNotExist:
+            return Response({"error": "User not found."}, status=404)
+
+
+password_reset_token = PasswordResetTokenGenerator()
+
+@permission_classes([AllowAny])
+class SendPasswordResetLinkView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        try:
+            user = AppUser.objects.get(email=email)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = password_reset_token.make_token(user)
+
+            reset_url = request.build_absolute_uri(
+                reverse('confirm_password_reset_link', kwargs={'uidb64': uid, 'token': token})
+            )
+
+            send_mail(
+                "Password Reset Link",
+                f"Click to reset your password: {reset_url}",
+                "noreply@example.com",
+                [email]
+            )
+            return Response({"message": "Password reset link sent to email."})
+        except AppUser.DoesNotExist:
+            return Response({"error": "User not found."}, status=404)
+
+
+class ConfirmPasswordResetLinkView(APIView):
+    def post(self, request, uidb64, token):
+        new_password = request.data.get("new_password")
+
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = AppUser.objects.get(pk=uid)
+
+            if password_reset_token.check_token(user, token):
+                user.set_password(new_password)
+                user.save()
+                return Response({"message": "Password reset successful."})
+            else:
+                return Response({"error": "Invalid or expired token."}, status=400)
+        except (TypeError, ValueError, OverflowError, AppUser.DoesNotExist):
+            return Response({"error": "Invalid user."}, status=400)
+        
+class SignOutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        logout(request)
+        return Response({"message": "Signed out successfully."})
+
+from workos import WorkOSClient
+from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import permission_classes
+from devhubapp.models import AppUser
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import login as auth_login
+
+# ✅ Correct WorkOS client
+workos_client = WorkOSClient(
+    api_key=settings.WORKOS_API_KEY,
+    client_id=settings.WORKOS_CLIENT_ID
+)
+
+@permission_classes([AllowAny])
+class GitHubLoginView(APIView):
+    def get(self, request):
+        try:
+            # ✅ Use workos_client.sso to get authorization URL
+            authorization_url = workos_client.sso.get_authorization_url(
+                provider="GitHubOAuth",
+                redirect_uri=settings.WORKOS_REDIRECT_URI,
+            )
+            return Response({"auth_url": authorization_url})
+        except Exception as e:
+            return Response({"error": f"Failed to get authorization URL: {e}"}, status=400)
+
+@permission_classes([AllowAny])
+class GitHubCallbackView(APIView):
+    def get(self, request):
+        code = request.GET.get("code")
+        if not code:
+            return Response({"error": "Missing code parameter."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            profile_and_token = workos_client.sso.get_profile_and_token(code=code)
+            profile = profile_and_token.profile
+            email = profile.email
+
+            user, created = AppUser.objects.get_or_create(
+                email=email,
+                defaults={
+                    "first_name": profile.first_name or "",
+                    "last_name": profile.last_name or "",
+                }
+            )
+
+            user.backend = "django.contrib.auth.backends.ModelBackend"
+            auth_login(request, user)
+            token, _ = Token.objects.get_or_create(user=user)
+
+            return Response({
+                "message": "GitHub login successful",
+                "token": token.key,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name
+                }
+            })
+
+        except Exception as e:
+            return Response({"error": f"Authentication failed: {e}"}, status=400)
+
+class UpdateUserProfileView(APIView):
+    permission_classes = [AllowAny]
+
+    def patch(self, request):
+       #user = AppUser.objects.get(pk=pk)
+        user = request.user
+        first_name = request.data.get("first_name")
+        last_name = request.data.get("last_name")
+
+        if first_name:
+            user.first_name = first_name
+        if last_name:
+            user.last_name = last_name
+
+        user.save()
+
+        return Response({
+            "message": "Profile updated successfully",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            }
+        }, status=status.HTTP_200_OK)
+
+from rest_framework import generics, permissions
+from .models import CardContent
+from .serializers import CardContentSerializer
+
+# Create new card (used when admin creates a card)
+class CardContentCreateView(generics.CreateAPIView):
+    queryset = CardContent.objects.all()
+    serializer_class = CardContentSerializer
+    permission_classes = [AllowAny]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+# Update card content (esp. the rich text description field)
+class CardContentUpdateView(generics.UpdateAPIView):
+    queryset = CardContent.objects.all()
+    serializer_class = CardContentSerializer
+    permission_classes = [AllowAny]
+    lookup_field = 'id'
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+# Display full card content (used by frontend)
+class CardContentDetailView(generics.RetrieveAPIView):
+    queryset = CardContent.objects.all()
+    serializer_class = CardContentSerializer
+    permission_classes = [permissions.AllowAny]  # or IsAuthenticated
+    lookup_field = 'id'
+
+
+
+class CardContentDeleteView(generics.DestroyAPIView):
+    queryset = CardContent.objects.all()
+    permission_classes = [AllowAny]
+    lookup_field = 'id'
+
+def get_or_create_shadow_user_for_admin(admin: Administrator):
+    """Ensure a Django auth user record exists for DRF TokenAuth."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    try:
+        user = User.objects.get(email=admin.email)
+    except User.DoesNotExist:
+        user = User.objects.create_user(
+            email=admin.email,
+            first_name=admin.first_name or "",
+            last_name=admin.last_name or "",
+        )
+        user.set_unusable_password()
+        user.is_staff = True
+        user.is_active = True
+        user.save()
+
+    return user
+
+class CardListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        cards = CardContent.objects.all()
+        serializer = CardContentSerializer(cards, many=True)
+        return Response(serializer.data)
