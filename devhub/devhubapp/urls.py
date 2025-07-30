@@ -15,8 +15,26 @@ from .api_views import (
     admin_logout_api,
     PasswordChangeDoneAPIView,
     AdminPhotoUploadView,
-    DeckViewSet, CategoryViewSet, AppUserViewSet,
+    DeckViewSet, 
+    CategoryViewSet, 
+    AppUserViewSet,
+    VerifyEmailOTPView,
+    SignUpView,
+    UpdatePasswordView,
+    SendPasswordResetLinkView,
+    ConfirmPasswordResetLinkView,
+    SendEmailVerificationOTPView,
+    UserLoginView,
+    SignOutView,
+    GitHubLoginView,
+    UpdateUserProfileView,
+    CardContentCreateView,
+    CardContentUpdateView,
+    CardContentDetailView,
+    CardContentDeleteView,
+     CardListView,
 )
+
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
@@ -59,4 +77,35 @@ urlpatterns = [
     # Custom AppUser endpoints
     path('users/', user_list, name='user-list'),
     path('users/<int:pk>/', user_delete, name='user-delete'),
+
+    # User Authentication
+    path("users/signup/", SignUpView.as_view(), name="signup"),
+    path("users/login/", UserLoginView.as_view(), name="login"),
+    path('users/logout/', SignOutView.as_view(), name='signout'),
+
+    # Email Verification
+    path("users/verify-email/send/", SendEmailVerificationOTPView.as_view(), name="send_email_verification_otp"),
+    path("users/verify-email/confirm/", VerifyEmailOTPView.as_view(), name="verify_email_otp"),
+    
+    # Update Password
+    path("users/password/update/", UpdatePasswordView.as_view(), name="update_password"),
+    path("users/profile/", UpdateUserProfileView.as_view(), name="update-user-profile"),
+
+    # Password Reset via link
+    path("users/password-reset/send/", SendPasswordResetLinkView.as_view(), name="send_password_reset_otp"),
+     path('users/reset-confirm/<uidb64>/<token>/', ConfirmPasswordResetLinkView.as_view(), name='confirm_password_reset_link'),
+     
+    #github
+    path('login/github/', GitHubLoginView.as_view(), name='github_login'),
+    #path('callback/', GitHubCallbackView.as_view(), name='github_callback')
+    
+    
+    #card content management
+    path('cards/delete/<int:id>/', CardContentDeleteView.as_view(), name='card-delete'),
+    path('cards/', CardContentCreateView.as_view(), name='card-create'),
+    path('cards/<int:id>/', CardContentDetailView.as_view(), name='card-detail'),
+    path('cards/update/<int:id>/', CardContentUpdateView.as_view(), name='card-update'),
+    path('cards/public/', CardListView.as_view()),
+
+
 ]
