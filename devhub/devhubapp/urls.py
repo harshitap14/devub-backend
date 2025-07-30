@@ -26,13 +26,12 @@ from .api_views import (
     SendEmailVerificationOTPView,
     UserLoginView,
     SignOutView,
-    GitHubLoginView,
     UpdateUserProfileView,
     CardContentCreateView,
     CardContentUpdateView,
     CardContentDetailView,
     CardContentDeleteView,
-     CardListView,
+    CardListView,
 )
 
 from rest_framework.routers import DefaultRouter
@@ -96,8 +95,6 @@ urlpatterns = [
      path('users/reset-confirm/<uidb64>/<token>/', ConfirmPasswordResetLinkView.as_view(), name='confirm_password_reset_link'),
      
     #github
-    path('login/github/', GitHubLoginView.as_view(), name='github_login'),
-    #path('callback/', GitHubCallbackView.as_view(), name='github_callback')
     
     
     #card content management
