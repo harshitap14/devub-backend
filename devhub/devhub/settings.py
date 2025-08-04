@@ -39,6 +39,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://d0812bg9-8000.inc1.devtunnels.ms",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://devub-backend-production.up.railway.app/",
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
