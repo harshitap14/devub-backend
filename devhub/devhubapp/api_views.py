@@ -1,4 +1,6 @@
-
+"""devhubapp/api_views.py
+Cleaned and corrected API views for Administrator management.
+"""
 from __future__ import annotations
 from rest_framework.parsers import MultiPartParser, FormParser
 import logging
@@ -34,7 +36,7 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from devhubapp.utils import get_or_create_shadow_user_for_appuser  # adjust import path
-#from workos import WorkOSClient
+from workos import WorkOSClient
 import os
 from .supabase_upload import upload_image_fileobj, build_public_url
 from .models import Administrator
@@ -515,6 +517,73 @@ class SignOutView(APIView):
         logout(request)
         return Response({"message": "Signed out successfully."})
 
+from workos import WorkOSClient
+from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import permission_classes
+from devhubapp.models import AppUser
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import login as auth_login
+
+# ✅ Correct WorkOS client
+workos_client = WorkOSClient(
+    api_key=settings.WORKOS_API_KEY,
+    client_id=settings.WORKOS_CLIENT_ID
+)
+
+@permission_classes([AllowAny])
+class GitHubLoginView(APIView):
+    def get(self, request):
+        try:
+            # ✅ Use workos_client.sso to get authorization URL
+            authorization_url = workos_client.sso.get_authorization_url(
+                provider="GitHubOAuth",
+                redirect_uri=settings.WORKOS_REDIRECT_URI,
+            )
+            return Response({"auth_url": authorization_url})
+        except Exception as e:
+            return Response({"error": f"Failed to get authorization URL: {e}"}, status=400)
+
+@permission_classes([AllowAny])
+class GitHubCallbackView(APIView):
+    def get(self, request):
+        code = request.GET.get("code")
+        if not code:
+            return Response({"error": "Missing code parameter."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            profile_and_token = workos_client.sso.get_profile_and_token(code=code)
+            profile = profile_and_token.profile
+            email = profile.email
+
+            user, created = AppUser.objects.get_or_create(
+                email=email,
+                defaults={
+                    "first_name": profile.first_name or "",
+                    "last_name": profile.last_name or "",
+                }
+            )
+
+            user.backend = "django.contrib.auth.backends.ModelBackend"
+            auth_login(request, user)
+            token, _ = Token.objects.get_or_create(user=user)
+
+            return Response({
+                "message": "GitHub login successful",
+                "token": token.key,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name
+                }
+            })
+
+        except Exception as e:
+            return Response({"error": f"Authentication failed: {e}"}, status=400)
 
 class UpdateUserProfileView(APIView):
     permission_classes = [AllowAny]
