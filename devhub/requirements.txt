@@ -14,8 +14,7 @@ Jinja2==3.1.4
 click==8.1.7
 botocore
 boto3
-
-
+workos==5.23.0
 
 
 
@@ -45,3 +44,4 @@ idna==3.10
 # django-stubs==5.2.1
 # ruff==0.12.1
 # Faker==37.3.0
+
