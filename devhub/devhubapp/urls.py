@@ -33,6 +33,8 @@ from .api_views import (
     CardContentDetailView,
     CardContentDeleteView,
      CardListView,
+     MostLikedCardsAPIView, 
+     MostBookmarkedCardsAPIView,
 )
 
 from rest_framework.routers import DefaultRouter
@@ -106,6 +108,9 @@ urlpatterns = [
     path('cards/<int:id>/', CardContentDetailView.as_view(), name='card-detail'),
     path('cards/update/<int:id>/', CardContentUpdateView.as_view(), name='card-update'),
     path('cards/public/', CardListView.as_view()),
+    #KPI's
+    path('cards/most-liked/', MostLikedCardsAPIView.as_view(), name='most-liked-cards'),
+    path('cards/most-bookmarked/', MostBookmarkedCardsAPIView.as_view(), name='most-bookmarked-cards'),
 
 
 ]
