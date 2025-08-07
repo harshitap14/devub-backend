@@ -130,11 +130,40 @@ class AdminListCreateAPIView(generics.ListCreateAPIView):
 # ------------------------------------------------------------------
 # Admin Retrieve/Update/Delete
 # ------------------------------------------------------------------
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
+from .models import Administrator
+from .serializers import AdminSerializer
+
 class AdminRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Administrator.objects.all()
     serializer_class = AdminSerializer
     permission_classes = [permissions.IsAuthenticated]
-    http_method_names = ['get', 'put','delete']
+    http_method_names = ['get', 'put', 'delete']
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        # Prevent non-superadmins from modifying role
+        if 'role' in request.data and request.user.role != 'superadmin':
+            return Response({'detail': 'Only superadmins can update roles.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Make password optional (ignore if not sent)
+        data = request.data.copy()
+        if not data.get('password'):
+            data.pop('password', None)
+
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        if request.user.role != 'superadmin':
+            return Response({'detail': 'Only superadmins can delete users.'}, status=status.HTTP_403_FORBIDDEN)
+
+        return super().destroy(request, *args, **kwargs)
+
 
 class AdminUpdateOnlyView(generics.UpdateAPIView):
     queryset = Administrator.objects.all()
