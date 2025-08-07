@@ -224,3 +224,54 @@ class CardContent(models.Model):
     updated_by = models.ForeignKey(User, related_name='cards_updated', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+from django.db import models
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class UserLike(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    card_content_id = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=255, blank=True)
+    updated_by = models.CharField(max_length=255, blank=True)
+    class Meta:
+        db_table = 'user_likes'
+
+class UserBookmark(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    card_content_id = models.IntegerField()
+    deck_name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=255, blank=True)
+    updated_by = models.CharField(max_length=255, blank=True)
+    class Meta:
+        db_table = 'user_bookmarks'
+    
+    
+
+class UtilityActivity(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    card_content_id = models.IntegerField()
+    activity_output = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=255, blank=True)
+    updated_by = models.CharField(max_length=255, blank=True)
+    class Meta:
+        db_table = 'utility_activity'
+
+class UtilityActivityFile(models.Model):
+    utility_activity = models.ForeignKey(UtilityActivity, on_delete=models.CASCADE, related_name='files')
+    file_type = models.CharField(max_length=50)
+    file_url = models.URLField()
+    file_size = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=255, blank=True)
+    updated_by = models.CharField(max_length=255, blank=True)
+    class Meta:
+        db_table = 'utility_activity_files'
