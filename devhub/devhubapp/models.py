@@ -8,8 +8,7 @@ from django.contrib.auth.hashers import make_password, check_password
 # ---------------------------------------------------------------------------
 class Administrator(models.Model):
     ROLE_CHOICES = (
-        ("Admin", "Admin"),
-        ("SuperAdmin", "Super Admin"),
+        ("Admin", "SuperAdmin"),
     )
 
     # core identity
