@@ -2,10 +2,12 @@ from rest_framework import serializers
 from .models import Administrator
 from .models import CardContent
 
+
+
+from rest_framework import serializers
+from devhubapp.models import Administrator
+
 class AdminCreateSerializer(serializers.ModelSerializer):
-    """
-    Used for creating a new admin via API (no password input).
-    """
     class Meta:
         model = Administrator
         fields = [
@@ -20,12 +22,28 @@ class AdminCreateSerializer(serializers.ModelSerializer):
         ]
 
 
+    def validate_role(self, value):
+        request = self.context.get("request")
+
+        if not request or not request.user or not request.user.is_authenticated:
+            return value  # Allow unauthenticated or anonymous creation (optional)
+
+        try:
+            current_admin = Administrator.objects.get(email=request.user.email)
+        except Administrator.DoesNotExist:
+            return value  # No admin record found; allow (e.g., for first superadmin)
+
+        # Role restriction: Admins cannot assign SuperAdmin role
+        if current_admin.role == "Admin" and value != "Admin":
+            raise serializers.ValidationError("Admins cannot create or promote to SuperAdmin.")
+
+        return value
+
+
 class AdminSerializer(serializers.ModelSerializer):
     """
-    General serializer for Admin details (read operations).
-    Includes phone, address, and photo fields.
+    General serializer for Admin details (read/update operations).
     """
-    # photo = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Administrator
@@ -55,6 +73,15 @@ class AdminSerializer(serializers.ModelSerializer):
             "updated_at",
             "last_login",
         ]
+    def validate_role(self, value):
+      user = self.context["request"].user
+      if user.role == "Admin" and value != "Admin":
+        raise serializers.ValidationError("You are not allowed to assign roles other than 'Admin'.")
+      return value
+
+   
+
+
 
 from rest_framework import serializers
 from .models import Deck, Category, AppUser
@@ -86,4 +113,34 @@ class CardContentSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['created_by', 'updated_by']
 
+from rest_framework import serializers
+from .models import UserLike, UserBookmark, UtilityActivity, UtilityActivityFile
 
+class UserLikeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserLike
+        fields = '__all__'
+
+class UserBookmarkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserBookmark
+        fields = '__all__'
+
+class UtilityActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UtilityActivity
+        fields = '__all__'
+
+class UtilityActivityFileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UtilityActivityFile
+        fields = '__all__'
+
+# serializers.py
+class CardContentStatsSerializer(serializers.ModelSerializer):
+    like_count = serializers.IntegerField(read_only=True)
+    bookmark_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = CardContent
+        fields = ['id', 'name', 'short_description', 'read_time', 'like_count', 'bookmark_count']
