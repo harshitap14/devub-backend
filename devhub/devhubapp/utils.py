@@ -1,17 +1,28 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 def get_or_create_shadow_user_for_appuser(appuser):
+    """
+    Creates or retrieves a shadow User instance for a given AppUser (e.g., Administrator).
+    Ensures DRF token authentication works by tying to a real User model.
+    """
+
     user, created = User.objects.get_or_create(
-        username=appuser.email,
+        email=appuser.email,
         defaults={
+            "username": appuser.email,  # ensure username is unique
             "first_name": appuser.first_name,
             "last_name": appuser.last_name,
-            "email": appuser.email,
         }
     )
 
-    # Optional: update user info in case AppUser info changed
-    if not created:
+    if created:
+        # Set a default unusable password unless you want them to log in directly
+        user.set_unusable_password()
+        user.save()
+    else:
+        # Optional: update user fields if appuser details changed
         updated = False
         if user.first_name != appuser.first_name:
             user.first_name = appuser.first_name
@@ -26,4 +37,3 @@ def get_or_create_shadow_user_for_appuser(appuser):
             user.save()
 
     return user
-
