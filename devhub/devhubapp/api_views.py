@@ -186,28 +186,72 @@ class AdminUpdateOnlyView(generics.UpdateAPIView):
 # ------------------------------------------------------------------
 # Admin Login
 # ------------------------------------------------------------------
+#from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, permissions
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import get_user_model
+
+from .models import Administrator
+from .serializers import AdminSerializer
+from .utils import get_or_create_shadow_user_for_appuser  # ✅ Ensure this works as expected
+
+User = get_user_model()
+
 class AdminLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         email = request.data.get("email")
         password = request.data.get("password")
+
         if not email or not password:
-            return Response({"error": "Email and password required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Email and password are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             admin = Administrator.objects.get(email=email)
         except Administrator.DoesNotExist:
-            return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {"error": "Invalid email or password."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
         if not admin.check_password(password):
-            return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {"error": "Invalid email or password."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Optional login tracking
         if hasattr(admin, "mark_login"):
             admin.mark_login()
-        print("Trying to login with", email, password)
-        print("Admin found:", admin)
-        shadow_user = get_or_create_shadow_user_for_admin(admin)
-        token, _ = Token.objects.get_or_create(user=shadow_user)
-        return Response({"token": token.key, "admin": AdminSerializer(admin).data})
-       
+
+        # Create or get shadow user to issue DRF token
+        try:
+            shadow_user = get_or_create_shadow_user_for_admin(admin)
+        except Exception as e:
+            return Response(
+                {"error": "Failed to create shadow user.", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # Create or retrieve token for shadow user
+        try:
+            token, _ = Token.objects.get_or_create(user=shadow_user)
+        except Exception as e:
+            return Response(
+                {"error": "Token creation failed.", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        return Response({
+            "token": token.key,
+            "admin": AdminSerializer(admin).data
+        }, status=status.HTTP_200_OK)
+
 # ------------------------------------------------------------------
 # Admin Password Set (after welcome email)
 # ------------------------------------------------------------------
