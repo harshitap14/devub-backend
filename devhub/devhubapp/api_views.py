@@ -104,7 +104,7 @@ class AdminListCreateAPIView(generics.ListCreateAPIView):
         return AdminCreateSerializer if self.request.method == "POST" else AdminSerializer
 
     def create(self, request, *args, **kwargs):
-        serializer = AdminCreateSerializer(data=request.data)
+        serializer = AdminCreateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         admin = Administrator.objects.create(
@@ -113,7 +113,8 @@ class AdminListCreateAPIView(generics.ListCreateAPIView):
             email=data["email"],
             role=data.get("role", "Admin"),
             status=True,
-            created_by=request.user.username if request.user.is_authenticated else None,
+            created_by = request.user.email if request.user.is_authenticated else None
+
         )
         admin.set_password("!")  # placeholder
         admin.save()
@@ -137,8 +138,20 @@ class AdminRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
 
 class AdminUpdateOnlyView(generics.UpdateAPIView):
     queryset = Administrator.objects.all()
-    serializer_class = AdminSerializer
-    http_method_names = ['put']  # Allow only PUT requests
+    serializer_class = AdminCreateSerializer  # or your dedicated update serializer
+    lookup_field = 'pk'
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # Pass context to serializer!
+        serializer = self.get_serializer(instance, data=request.data, partial=partial, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
 
 
 # ------------------------------------------------------------------
@@ -675,3 +688,63 @@ class CardListView(APIView):
         cards = CardContent.objects.all()
         serializer = CardContentSerializer(cards, many=True)
         return Response(serializer.data)
+
+# views.py
+from django.db.models import Count
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import CardContent
+from .serializers import CardContentStatsSerializer
+
+class MostLikedCardsAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        cards = CardContent.objects.annotate(
+            like_count=Count('userlike'),
+            bookmark_count=Count('userbookmark')  # optional if you want both stats
+        ).order_by('-like_count')[:10]  # top 10 most liked
+
+        serializer = CardContentStatsSerializer(cards, many=True)
+        return Response(serializer.data)
+
+class MostBookmarkedCardsAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        cards = CardContent.objects.annotate(
+            bookmark_count=Count('userbookmark'),
+            like_count=Count('userlike')  
+        ).order_by('-bookmark_count')[:10] 
+
+        serializer = CardContentStatsSerializer(cards, many=True)
+        return Response(serializer.data)
+
+from rest_framework import viewsets
+from .models import Administrator
+from .serializers import AdminSerializer, AdminCreateSerializer
+from .permissions import IsSuperAdminOrAdminCreateOnly
+from rest_framework.exceptions import PermissionDenied
+
+
+class AdministratorViewSet(viewsets.ModelViewSet):
+    queryset = Administrator.objects.all()
+    serializer_class = AdminSerializer
+    permission_classes = [IsSuperAdminOrAdminCreateOnly]
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        instance = self.get_object()
+
+        # Prevent admins from changing the role
+        if user.role == 'admin' and 'role' in self.request.data:
+            if self.request.data['role'] != instance.role:
+                raise PermissionDenied("Admins are not allowed to change roles.")
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if user.role != 'superadmin':
+            raise PermissionDenied("Only superadmins can delete users.")
+        instance.delete()
