@@ -17,8 +17,11 @@ class UserGroups(models.Model):
 # ---------------------------------------------------------------------------
 class Administrator(models.Model):
     ROLE_CHOICES = (
-        ("Admin", "SuperAdmin"),
+        ("Admin", "Admin"),
+        ("SuperAdmin", "SuperAdmin"),
     )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+
 
     # core identity
     name = models.CharField(max_length=200, blank=True)
@@ -108,6 +111,15 @@ from django.utils import timezone
 from django.db import models
 
 class AppUser(AbstractBaseUser):
+    ROLE_CHOICES = (
+        ('user', 'User'),
+        ('admin', 'Admin'),
+        ('superadmin', 'SuperAdmin'),
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')
+
+    # other fields...
+
     STATUS_CHOICES = (
         ("Pending", "Pending"),
         ("Done", "Done"),
