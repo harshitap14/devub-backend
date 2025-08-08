@@ -1,8 +1,17 @@
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.auth.models import Permission
+from django.db import models
+from django.contrib.auth.models import Group
 
+class UserGroups(models.Model):
+    user = models.ForeignKey('AppUser', on_delete=models.CASCADE)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
 
+    class Meta:
+        db_table = 'users_groups'
+        unique_together = ('user', 'group')
 # ---------------------------------------------------------------------------
 # Administrator Model
 # ---------------------------------------------------------------------------
@@ -72,10 +81,7 @@ class Administrator(models.Model):
 # ---------------------------------------------------------------------------
 # AppUser Model
 # ---------------------------------------------------------------------------
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
-from django.db import models
-from django.utils import timezone
-from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.auth.models import BaseUserManager
 
 class AppUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -93,7 +99,15 @@ class AppUserManager(BaseUserManager):
         extra_fields.setdefault('is_active', True)
         return self.create_user(email, password, **extra_fields)
 
-class AppUser(AbstractBaseUser, PermissionsMixin):
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, Group, Permission
+from django.db import models
+from django.utils import timezone
+
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, Group, Permission
+from django.utils import timezone
+from django.db import models
+
+class AppUser(AbstractBaseUser):
     STATUS_CHOICES = (
         ("Pending", "Pending"),
         ("Done", "Done"),
@@ -112,6 +126,16 @@ class AppUser(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    groups = models.ManyToManyField(
+        Group,
+        blank=True,
+        through='UserGroups',  # this must match your custom through model
+        related_name='appuser_set',
+        related_query_name='appuser'
+    )
+
+   
+
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name']
 
@@ -128,6 +152,7 @@ class AppUser(AbstractBaseUser, PermissionsMixin):
     @property
     def name(self):
         return f"{self.first_name} {self.last_name}".strip()
+
 
 
 
@@ -274,3 +299,5 @@ class UtilityActivityFile(models.Model):
     updated_by = models.CharField(max_length=255, blank=True)
     class Meta:
         db_table = 'utility_activity_files'
+
+
