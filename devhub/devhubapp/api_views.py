@@ -132,55 +132,73 @@ class AdminListCreateAPIView(generics.ListCreateAPIView):
 # ------------------------------------------------------------------
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from .models import Administrator
-from .serializers import AdminSerializer
+from rest_framework.generics import RetrieveUpdateDestroyAPIView
+from devhubapp.models import Administrator
+from devhubapp.serializers import AdminCreateSerializer
+from rest_framework.permissions import IsAuthenticated
 
-class AdminRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.generics import RetrieveUpdateDestroyAPIView
+from rest_framework.response import Response
+from devhubapp.models import Administrator
+from devhubapp.serializers import AdminCreateSerializer
+
+class AdminDetailView(RetrieveUpdateDestroyAPIView):
     queryset = Administrator.objects.all()
-    serializer_class = AdminSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    http_method_names = ['get', 'put', 'delete']
+    serializer_class = AdminCreateSerializer
+    permission_classes = [IsAuthenticated]
 
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
+    def delete(self, request, *args, **kwargs):
+        print("🔐 Logged-in user:", request.user.email)
 
-        # Prevent non-superadmins from modifying role
-        if 'role' in request.data and request.user.role != 'superadmin':
-            return Response({'detail': 'Only superadmins can update roles.'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            Admin = Administrator.objects.get(email=request.user.email)
+            print("✅ Matched Administrator:", Admin)
+        except Administrator.DoesNotExist:
+            print("❌ No matching Administrator")
+            return Response({"error": "You are not an admin."}, status=status.HTTP_403_FORBIDDEN)
+             
+        if Admin.role.strip().lower() != 'superadmin':
+            print("⛔ Not a SuperAdmin:", Admin.role)
+            return Response({"error": "Only superadmins can delete admins."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Make password optional (ignore if not sent)
-        data = request.data.copy()
-        if not data.get('password'):
-            data.pop('password', None)
+        print("🗑️ SuperAdmin allowed to delete")
+        return self.destroy(request, *args, **kwargs)
 
-        serializer = self.get_serializer(instance, data=data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        return Response(serializer.data)
 
-    def destroy(self, request, *args, **kwargs):
-        if request.user.role != 'superadmin':
-            return Response({'detail': 'Only superadmins can delete users.'}, status=status.HTTP_403_FORBIDDEN)
-
-        return super().destroy(request, *args, **kwargs)
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import generics, status
+from rest_framework.response import Response
+from .models import Administrator
+from .serializers import AdminCreateSerializer
 
 
 class AdminUpdateOnlyView(generics.UpdateAPIView):
     queryset = Administrator.objects.all()
-    serializer_class = AdminCreateSerializer  # or your dedicated update serializer
+    serializer_class = AdminCreateSerializer
     lookup_field = 'pk'
+    permission_classes = [IsAuthenticated]
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        
-        # Pass context to serializer!
+
+        try:
+            admin = Administrator.objects.get(email=request.user.email)
+        except Administrator.DoesNotExist:
+            return Response({"error": "You are not an admin."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Normalize role and remove role from request if not superadmin
+        if ''.join(admin.role.split()).lower() != 'superadmin':
+            if 'role' in request.data:
+                print(f"⛔ Not allowed to change role: {admin.email}")
+                request.data.pop('role', None)
+
         serializer = self.get_serializer(instance, data=request.data, partial=partial, context={"request": request})
         serializer.is_valid(raise_exception=True)
-
         self.perform_update(serializer)
         return Response(serializer.data)
-
 
 
 # ------------------------------------------------------------------
