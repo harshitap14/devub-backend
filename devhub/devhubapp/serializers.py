@@ -1,12 +1,6 @@
 from rest_framework import serializers
-from .models import Administrator
 from .models import CardContent
-
-
-
-from rest_framework import serializers
 from devhubapp.models import Administrator
-
 class AdminCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Administrator
@@ -20,8 +14,6 @@ class AdminCreateSerializer(serializers.ModelSerializer):
             "country",
             "photo",
         ]
-
-
     def validate_role(self, value):
         request = self.context.get("request")
 
@@ -38,8 +30,6 @@ class AdminCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Admins cannot create or promote to SuperAdmin.")
 
         return value
-
-
 class AdminSerializer(serializers.ModelSerializer):
     """
     General serializer for Admin details (read/update operations).
@@ -78,11 +68,6 @@ class AdminSerializer(serializers.ModelSerializer):
       if user.role == "Admin" and value != "Admin":
         raise serializers.ValidationError("You are not allowed to assign roles other than 'Admin'.")
       return value
-
-   
-
-
-
 from rest_framework import serializers
 from .models import Deck, Category, AppUser
 
@@ -104,9 +89,6 @@ class AppUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppUser
         fields = ['id', 'first_name', 'last_name', 'email', 'email_verified', 'status', 'created_at', 'updated_at', 'last_login']
-        
-        
-
 class CardContentSerializer(serializers.ModelSerializer):
     class Meta:
         model = CardContent
@@ -144,3 +126,12 @@ class CardContentStatsSerializer(serializers.ModelSerializer):
     class Meta:
         model = CardContent
         fields = ['id', 'name', 'short_description', 'read_time', 'like_count', 'bookmark_count']
+
+
+
+
+
+
+
+
+
