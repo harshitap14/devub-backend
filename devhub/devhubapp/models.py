@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth.models import Permission
 from django.db import models
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, AbstractBaseUser, PermissionsMixin, BaseUserManager
 
 class UserGroups(models.Model):
     user = models.ForeignKey('AppUser', on_delete=models.CASCADE)
@@ -84,10 +84,11 @@ class Administrator(models.Model):
 # ---------------------------------------------------------------------------
 # AppUser Model
 # ---------------------------------------------------------------------------
-from django.contrib.auth.models import BaseUserManager
-
 class AppUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
+        """
+        Creates and saves a User with the given email and password.
+        """
         if not email:
             raise ValueError('The Email must be set')
         email = self.normalize_email(email)
@@ -97,56 +98,54 @@ class AppUserManager(BaseUserManager):
         return user
 
     def create_superuser(self, email, password=None, **extra_fields):
+        """
+        Creates and saves a superuser with the given email and password.
+        """
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('is_active', True)
+        
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+        
         return self.create_user(email, password, **extra_fields)
 
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, Group, Permission
-from django.db import models
-from django.utils import timezone
 
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, Group, Permission
-from django.utils import timezone
-from django.db import models
-
-class AppUser(AbstractBaseUser):
+class AppUser(AbstractBaseUser, PermissionsMixin):
+    # Only one role choice, as requested.
     ROLE_CHOICES = (
         ('user', 'User'),
-        ('admin', 'Admin'),
-        ('superadmin', 'SuperAdmin'),
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')
-
-    # other fields...
+    
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+    email_verified = models.BooleanField(default=False)
 
     STATUS_CHOICES = (
         ("Pending", "Pending"),
         ("Done", "Done"),
     )
-
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
-    email_verified = models.BooleanField(default=False)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="Pending")
+    
     last_login = models.DateTimeField(default=timezone.now)
-
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
-
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Note: If you're using a custom through model, it should be defined here.
     groups = models.ManyToManyField(
         Group,
+        through='UserGroups',
         blank=True,
-        through='UserGroups',  # this must match your custom through model
         related_name='appuser_set',
         related_query_name='appuser'
     )
-
-   
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name']
@@ -164,8 +163,6 @@ class AppUser(AbstractBaseUser):
     @property
     def name(self):
         return f"{self.first_name} {self.last_name}".strip()
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +265,7 @@ User = get_user_model()
 
 class UserLike(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    card_content_id = models.IntegerField()
+    card_content_id = models.ForeignKey('CardContent', on_delete=models.CASCADE, related_name='likes')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.CharField(max_length=255, blank=True)
@@ -311,5 +308,3 @@ class UtilityActivityFile(models.Model):
     updated_by = models.CharField(max_length=255, blank=True)
     class Meta:
         db_table = 'utility_activity_files'
-
-
