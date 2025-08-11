@@ -49,7 +49,7 @@ def get_or_create_shadow_user_for_admin(admin):
 
     # Try to find a matching auth_user by email
     user, created = User.objects.get_or_create(
-        username=admin.email,  # use email as username for uniqueness
+        email=admin.email,  # Corrected to use 'email' instead of 'username'
         defaults={
             "first_name": admin.first_name,
             "last_name": admin.last_name,
@@ -64,34 +64,3 @@ def get_or_create_shadow_user_for_admin(admin):
         admin.save(update_fields=["user"])
 
     return user
-
-from django.contrib.auth import get_user_model
-from rest_framework.authtoken.models import Token
-from django.utils.http import urlsafe_base64_encode
-from django.utils.encoding import force_bytes
-
-User = get_user_model()
-
-def generate_uid_and_token(admin):
-    """
-    Ensure a matching User exists for the given admin instance,
-    then return a base64 UID and the user's auth token.
-    """
-    # Ensure matching user in AUTH_USER_MODEL
-    user, _ = User.objects.get_or_create(
-        email=admin.email,
-        defaults={
-            "first_name": admin.first_name,
-            "last_name": admin.last_name,
-            "username": admin.email,   # use email as username for uniqueness
-            "password": "!"            # placeholder (won't be used for login)
-        }
-    )
-
-    # Create or retrieve the auth token
-    token, _ = Token.objects.get_or_create(user=user)
-
-    # Create base64 encoded user ID
-    uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
-
-    return uidb64, token.key
