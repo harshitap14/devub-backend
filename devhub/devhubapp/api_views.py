@@ -95,12 +95,26 @@ def update_admin_and_shadow_password(admin: Administrator, raw_password: str) ->
 # ------------------------------------------------------------------
 # Admin Create + List
 # ------------------------------------------------------------------
-from rest_framework import status
+from django.db.models import Count
+from rest_framework import generics, status
+from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from .models import Administrator, CardContent
+from .serializers import AdminSerializer, AdminCreateSerializer, CardContentStatsSerializer
+from .utils import get_or_create_shadow_user_for_admin
+from .email_utils import send_admin_welcome_email
+import logging
 
-# ... (other imports)
+logger = logging.getLogger(__name__)
 
 class AdminListCreateAPIView(generics.ListCreateAPIView):
+    # This is the line that was missing and caused the error
+    queryset = Administrator.objects.all()
+    permission_classes = [AllowAny]
+
+    def get_serializer_class(self):
+        return AdminCreateSerializer if self.request.method == "POST" else AdminSerializer
 
     def create(self, request, *args, **kwargs):
         serializer = AdminCreateSerializer(data=request.data, context={'request': request})
@@ -119,17 +133,10 @@ class AdminListCreateAPIView(generics.ListCreateAPIView):
         admin.save()
 
         try:
-            # Ensure the shadow user is created and linked.
-            # This function is used by the email utility.
-            shadow_user = get_or_create_shadow_user_for_admin(admin)
-
-            # Now safe to send the email. The email function handles its own token generation.
+            get_or_create_shadow_user_for_admin(admin)
             send_admin_welcome_email(admin)
-
         except Exception as e:
             logger.exception("Failed to create shadow user or send admin welcome email: %s", e)
-            # You might want to handle this more gracefully, e.g., by deleting the admin object
-            # and returning an error response to the user.
 
         return Response(AdminSerializer(admin).data, status=status.HTTP_201_CREATED)
 # ------------------------------------------------------------------
