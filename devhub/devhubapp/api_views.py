@@ -127,7 +127,9 @@ class AdminListCreateAPIView(generics.ListCreateAPIView):
             email=data["email"],
             role=data.get("role", "Admin"),
             status=True,
-            created_by=request.user.email if request.user.is_authenticated else None
+            created_by=request.user.email if request.user.is_authenticated else None,
+            updated_by=request.user.email if request.user.is_authenticated else None
+
         )
         admin.set_password("!")
         admin.save()
