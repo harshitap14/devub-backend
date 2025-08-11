@@ -4,7 +4,6 @@ Cleaned and corrected API views for Administrator management.
 from __future__ import annotations
 from rest_framework.parsers import MultiPartParser, FormParser
 import logging
-from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -20,7 +19,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import logout
-
+from django.contrib.auth import get_user_model
 from botocore.exceptions import ClientError
 import random
 import string
@@ -42,11 +41,11 @@ from .supabase_upload import upload_image_fileobj, build_public_url
 from .models import Administrator
 from .serializers import AdminCreateSerializer, AdminSerializer, AppUserSerializer
 from .email_utils import (
-    generate_uid_and_token,
+    
     send_admin_welcome_email,
     send_admin_reset_email,
 )
-
+from .utils import get_or_create_shadow_user_for_admin, generate_uid_and_token
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -96,37 +95,43 @@ def update_admin_and_shadow_password(admin: Administrator, raw_password: str) ->
 # ------------------------------------------------------------------
 # Admin Create + List
 # ------------------------------------------------------------------
-class AdminListCreateAPIView(generics.ListCreateAPIView):
-    queryset = Administrator.objects.all()
-    permission_classes = [AllowAny]  # Allow unauthenticated access for listing
+from rest_framework import status
+from rest_framework.response import Response
 
-    def get_serializer_class(self):
-        return AdminCreateSerializer if self.request.method == "POST" else AdminSerializer
+# ... (other imports)
+
+class AdminListCreateAPIView(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         serializer = AdminCreateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+
         admin = Administrator.objects.create(
             first_name=data["first_name"],
             last_name=data["last_name"],
             email=data["email"],
             role=data.get("role", "Admin"),
             status=True,
-            created_by = request.user.email if request.user.is_authenticated else None
-
+            created_by=request.user.email if request.user.is_authenticated else None
         )
-        admin.set_password("!")  # placeholder
+        admin.set_password("!")
         admin.save()
-        get_or_create_shadow_user_for_admin(admin)
+
         try:
-            uidb64, token = generate_uid_and_token(admin)
+            # Ensure the shadow user is created and linked.
+            # This function is used by the email utility.
+            shadow_user = get_or_create_shadow_user_for_admin(admin)
+
+            # Now safe to send the email. The email function handles its own token generation.
             send_admin_welcome_email(admin)
 
-        except Exception:
-            logger.exception("Failed to send admin welcome email")
-        return Response(AdminSerializer(admin).data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            logger.exception("Failed to create shadow user or send admin welcome email: %s", e)
+            # You might want to handle this more gracefully, e.g., by deleting the admin object
+            # and returning an error response to the user.
 
+        return Response(AdminSerializer(admin).data, status=status.HTTP_201_CREATED)
 # ------------------------------------------------------------------
 # Admin Retrieve/Update/Delete
 # ------------------------------------------------------------------
@@ -752,25 +757,7 @@ class CardContentDeleteView(generics.DestroyAPIView):
     permission_classes = [AllowAny]
     lookup_field = 'id'
 
-def get_or_create_shadow_user_for_admin(admin: Administrator):
-    """Ensure a Django auth user record exists for DRF TokenAuth."""
-    from django.contrib.auth import get_user_model
-    User = get_user_model()
-
-    try:
-        user = User.objects.get(email=admin.email)
-    except User.DoesNotExist:
-        user = User.objects.create_user(
-            email=admin.email,
-            first_name=admin.first_name or "",
-            last_name=admin.last_name or "",
-        )
-        user.set_unusable_password()
-        user.is_staff = True
-        user.is_active = True
-        user.save()
-
-    return user
+User = get_user_model()
 
 class CardListView(APIView):
     permission_classes = [AllowAny]
@@ -784,6 +771,7 @@ class CardListView(APIView):
 from django.db.models import Count
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from .models import CardContent
 from .serializers import CardContentStatsSerializer
 
@@ -792,9 +780,8 @@ class MostLikedCardsAPIView(APIView):
 
     def get(self, request):
         cards = CardContent.objects.annotate(
-            like_count=Count('userlike'),
-            bookmark_count=Count('userbookmark')  # optional if you want both stats
-        ).order_by('-like_count')[:10]  # top 10 most liked
+            like_count=Count('likes'),
+        ).order_by('-like_count')[:10]
 
         serializer = CardContentStatsSerializer(cards, many=True)
         return Response(serializer.data)
@@ -804,12 +791,13 @@ class MostBookmarkedCardsAPIView(APIView):
 
     def get(self, request):
         cards = CardContent.objects.annotate(
-            bookmark_count=Count('userbookmark'),
-            like_count=Count('userlike')  
-        ).order_by('-bookmark_count')[:10] 
+            bookmark_count=Count('bookmarks'),
+        ).order_by('-bookmark_count')[:10]
 
         serializer = CardContentStatsSerializer(cards, many=True)
         return Response(serializer.data)
+
+
 
 from rest_framework import viewsets
 from .models import Administrator
