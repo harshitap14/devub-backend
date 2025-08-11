@@ -39,7 +39,6 @@ CORS_ALLOWED_ORIGINS = [
     "https://d0812bg9-8000.inc1.devtunnels.ms",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://devub-backend-production.up.railway.app/",
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
@@ -96,6 +95,7 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    'AUTH_USER_MODEL': 'devhubapp.AppUser',
 }
 
 # --- Email (Gmail SMTP) ---
@@ -118,7 +118,9 @@ CSRF_TRUSTED_ORIGINS = [
 #MEDIA_URL = "/media/"
 #MEDIA_ROOT = BASE_DIR / "media"
 
-AUTH_USER_MODEL = 'devhubapp.AppUser'
+# settings.py
+AUTH_USER_MODEL = "devhubapp.AppUser"
+
 
 # Internationalization
 LANGUAGE_CODE = "en-us"
@@ -140,4 +142,3 @@ WORKOS_API_KEY = "sk_test_a2V5XzAxSllLSkE0U0pYNFg1WFBTSE4yRFdUVkhZLFVsYnMwZFFBNE
 WORKOS_CLIENT_ID = "client_01JYKJA5EEXMYRTHKZVN3ZQJCB"
 WORKOS_REDIRECT_URI = "http://localhost:8000/callback/"
 WORKOS_ORGANIZATION_ID = "org_01JYRQXPG1SQGN0MRHEY994GH2"
-
