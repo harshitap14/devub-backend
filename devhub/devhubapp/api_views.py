@@ -46,7 +46,7 @@ from .email_utils import (
     send_admin_reset_email,
     generate_uid_and_token
 )
-from .utils import get_or_create_shadow_user_for_admin, 
+from .utils import get_or_create_shadow_user_for_admin, get_or_create_shadow_user_for_appuser
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
